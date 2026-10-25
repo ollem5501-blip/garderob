@@ -4,6 +4,7 @@ import * as E from './engine.js';
 import * as DB from './db.js';
 import * as WX from './weather.js';
 import { DEMO } from './demo.js';
+import * as FIT from './tryon.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -225,6 +226,7 @@ function lookHtml() {
         <button class="btn" data-act="next">Другой</button>
         <button class="btn main" data-act="wear">Надену</button>
       </div>
+      <button class="btn wide fitbtn" data-act="fit-outfit">Примерить на себе</button>
     </div>
     <div class="acc">
       ${row('i-shoe', 'Обувь', sh)}${row('i-hair', 'Прическа', hr)}${row('i-lips', 'Макияж', mk)}
@@ -261,7 +263,8 @@ function renderWardrobe(anim = true) {
     .sort((a, b) => ORDER.indexOf(E.catOf(a)) - ORDER.indexOf(E.catOf(b)));
   show(`
     <header class="top"><h1 class="ttl">Гардероб</h1>
-      <div class="sub">${S.items.length} ${E.plural(S.items.length, 'вещь', 'вещи', 'вещей')}${S.items.some(i => i.demo) ? ' · есть пример' : ''}</div></header>
+      <div class="sub">${S.items.length} ${E.plural(S.items.length, 'вещь', 'вещи', 'вещей')}${S.items.some(i => i.demo) ? ' · есть пример' : ''}</div>
+      <div class="chips"><button class="chip" data-act="fit-open">Примерка на себе</button></div></header>
     ${S.items.length ? `<div class="occ">${f.map(c => `<button class="pill${S.filter === c ? ' on' : ''}" data-act="filter" data-id="${c}">${c === 'all' ? 'Все' : D.CAT[c].name}<span class="n">${c === 'all' ? S.items.length : cnt(c)}</span></button>`).join('')}</div>
     <div class="wg">${list.map(it => `<button data-act="edit" data-id="${it.id}">${tile(it)}<div class="nm">${esc(E.itemName(it, true))}</div></button>`).join('')}</div>`
     : `<div class="card empty"><div class="ttl">Начнем с фото</div>
@@ -410,6 +413,7 @@ function renderMe() {
       ${r('pf-shape', 'Тип фигуры', D.BODYM[p.body]?.name || 'не указан')}
       ${r('pf-color', 'Цветотип', D.CTM[p.colortype] ? `${D.CTM[p.colortype].name} (${D.CTM[p.colortype].note})` : 'не указан')}
       ${r('pf-city', 'Город для погоды', p.city?.name || 'не указан')}
+      ${r('fit-open', 'Примерка', 'мое фото во весь рост и вещи поверх')}
     </div>
     <div class="h2">Оформление</div>
     <div class="themes">${THEMES.map(t => `<button class="th${S.set.theme === t.id ? ' on' : ''}" style="background:${t.c[0]};color:${['t2', 't4', 't5'].includes(t.id) ? '#F1E8D8' : '#2C3324'}" data-act="theme" data-id="${t.id}"><i>${t.c.slice(1).map(c => `<u style="background:${c}"></u>`).join('')}</i>${t.name}</button>`).join('')}</div>
@@ -568,7 +572,10 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]');
   if (!b) return;
   const id = b.dataset.id;
+  if (b.dataset.act.startsWith('fit-') && !['fit-open', 'fit-outfit'].includes(b.dataset.act)) { FIT.fitAction(b.dataset.act, b); return; }
   switch (b.dataset.act) {
+    case 'fit-open': FIT.openTryon(null); break;
+    case 'fit-outfit': FIT.openTryon(S.outfits[S.oi]?.items || []); break;
     case 'tab': if (S.sheet) closeSheet(); S.tab = b.dataset.tab; render(); scrollTo(0, 0); break;
     case 'occ': S.occ = id; recompute(); renderToday(false); break;
     case 'day': S.day = S.day ? 0 : 1; S.manual = null; recompute(); renderToday(false); break;
@@ -713,6 +720,7 @@ async function exportBackup() {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
+$('#inMe').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) FIT.setMyPhoto(f); });
 $('#inCam').addEventListener('change', e => { takeFiles([...e.target.files]); e.target.value = ''; });
 $('#inGal').addEventListener('change', e => { takeFiles([...e.target.files]); e.target.value = ''; });
 $('#inBackup').addEventListener('change', async e => {
@@ -754,3 +762,4 @@ async function warmFonts() {
 
 // для проверок
 window.__S = S;
+FIT.initTryon({ S, openSheet, toast, tile, shapeImg, photoUrl });

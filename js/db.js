@@ -4,18 +4,22 @@ import { COLORS } from './data.js';
 let dbp;
 function db() {
   return dbp ||= new Promise((res, rej) => {
-    const r = indexedDB.open('wardrobe', 1);
-    r.onupgradeneeded = () => r.result.createObjectStore('items', { keyPath: 'id' });
+    const r = indexedDB.open('wardrobe', 2);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      if (!d.objectStoreNames.contains('items')) d.createObjectStore('items', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('blobs')) d.createObjectStore('blobs'); // фото для примерки и вырезанные вещи
+    };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
   });
 }
-async function tx(mode, fn) {
+async function tx(mode, fn, store = 'items') {
   const d = await db();
   return new Promise((res, rej) => {
-    const t = d.transaction('items', mode);
-    const out = fn(t.objectStore('items'));
-    t.oncomplete = () => res(out?.result ?? out);
+    const t = d.transaction(store, mode);
+    const out = fn(t.objectStore(store));
+    t.oncomplete = () => res(out instanceof IDBRequest ? out.result : out);
     t.onerror = () => rej(t.error);
   });
 }
@@ -23,6 +27,9 @@ export const allItems = () => tx('readonly', s => s.getAll());
 export const putItem = it => tx('readwrite', s => s.put(it));
 export const delItem = id => tx('readwrite', s => s.delete(id));
 export const clearItems = () => tx('readwrite', s => s.clear());
+export const getBlob = key => tx('readonly', s => s.get(key), 'blobs');
+export const putBlob = (key, blob) => tx('readwrite', s => s.put(blob, key), 'blobs');
+export const delBlob = key => tx('readwrite', s => s.delete(key), 'blobs');
 
 export function load(key, def) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch { return def; }
@@ -38,16 +45,16 @@ export async function persist() {
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 // ---------- фото: уменьшить и найти основной цвет ----------
-export async function processPhoto(file) {
+export async function processPhoto(file, max = 900, withColors = true) {
   const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch(() => loadImg(file));
-  const max = 900, k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
   const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
   const cv = document.createElement('canvas');
   cv.width = w; cv.height = h;
   const cx = cv.getContext('2d');
   cx.drawImage(bmp, 0, 0, w, h);
   const blob = await new Promise(r => cv.toBlob(r, 'image/webp', 0.86));
-  return { blob: blob || file, colors: dominant(cx, w, h) };
+  return { blob: blob || file, colors: withColors ? dominant(cx, w, h) : [] };
 }
 function loadImg(file) {
   return new Promise((res, rej) => {
@@ -100,7 +107,8 @@ export async function exportAll(profile) {
   const enc = b => new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); });
   const out = [];
   for (const it of items) out.push({ ...it, photo: it.photo ? await enc(it.photo) : null });
-  return new Blob([JSON.stringify({ app: 'wardrobe', v: 1, profile, items: out })], { type: 'application/json' });
+  const me = await getBlob('me').catch(() => null);
+  return new Blob([JSON.stringify({ app: 'wardrobe', v: 1, profile, items: out, me: me ? await enc(me) : null, fit: load('fit', {}) })], { type: 'application/json' });
 }
 export async function importAll(file) {
   const data = JSON.parse(await file.text());
@@ -109,5 +117,7 @@ export async function importAll(file) {
     if (it.photo) it.photo = await (await fetch(it.photo)).blob();
     await putItem(it);
   }
+  if (data.me) await putBlob('me', await (await fetch(data.me)).blob());
+  if (data.fit) save('fit', { ...load('fit', {}), ...data.fit });
   return data.profile;
 }

@@ -1,8 +1,8 @@
 // Работа без интернета: оболочка приложения и шрифты хранятся в телефоне.
-const VERSION = 'garderob-v4'; // менять при каждой выкладке
+const VERSION = 'garderob-v5'; // менять при каждой выкладке
 const SHELL = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
-  'js/app.js', 'js/data.js', 'js/engine.js', 'js/db.js', 'js/weather.js', 'js/demo.js',
+  'js/app.js', 'js/data.js', 'js/engine.js', 'js/db.js', 'js/weather.js', 'js/demo.js', 'js/tryon.js',
   'icons/icon-192.png', 'icons/icon-512.png',
 ];
 
