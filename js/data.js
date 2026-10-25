@@ -217,3 +217,31 @@ export function shopLinks(typeId, colorId) {
     ozon: `https://ozon.by/search/?text=${q}`,
   };
 }
+
+// Размер одежды по типовой таблице РФ: [размер, грудь, талия, бедра], см. У марок таблицы отличаются.
+export const RU_SIZES = [
+  [40, 80, 62, 88], [42, 84, 66, 92], [44, 88, 70, 96], [46, 92, 74, 100], [48, 96, 78, 104],
+  [50, 100, 82, 108], [52, 104, 86, 112], [54, 108, 90, 116], [56, 112, 94, 120],
+];
+const pickSize = (col, v) => (RU_SIZES.find(r => v <= r[col] + 1) || RU_SIZES[RU_SIZES.length - 1])[0];
+
+export function sizeFor(prof, typeId) {
+  const t = TYPE[typeId], m = prof.meas || {};
+  if (!t || t.cat === 'bag' || t.cat === 'acc') return null;
+  if (t.cat === 'shoes') return prof.shoe ? { size: String(prof.shoe), note: 'ваш размер обуви' } : null;
+  const sb = m.b ? pickSize(1, m.b) : 0, sw = m.w ? pickSize(2, m.w) : 0, sh = m.h ? pickSize(3, m.h) : 0;
+  if (!sb && !sw && !sh) return null;
+  let size, note;
+  if (t.cat === 'top' || t.cat === 'layer') {
+    size = sb || Math.max(sw, sh); note = m.b ? `по груди ${m.b} см` : 'по талии и бедрам';
+    if (t.cat === 'layer' && sb && sh - sb >= 4) note += `; если длиной до бедер — проверьте бедра, может понадобиться ${sh}`;
+  } else if (t.cat === 'bottom') {
+    size = Math.max(sh, sw) || sb; note = sw > sh ? `по талии ${m.w} см` : m.h ? `по бедрам ${m.h} см` : 'по груди';
+  } else {
+    size = Math.max(sb, sw, sh);
+    note = size === sh && m.h ? `по бедрам ${m.h} см` : size === sb && m.b ? `по груди ${m.b} см` : `по талии ${m.w} см`;
+    if (t.cat === 'dress' && sb && size - sb >= 4) note += '; в груди может быть свободно — подойдет трикотаж или запах';
+    if (t.cat === 'outer' && (t.warm || 1) >= 2) note += '; под толстый свитер — на размер больше';
+  }
+  return { size: String(size), note };
+}

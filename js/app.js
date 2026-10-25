@@ -385,18 +385,23 @@ function renderShop() {
     $('#shopSub').textContent = S.items.length
       ? `${S.items.length} ${E.plural(S.items.length, 'вещь', 'вещи', 'вещей')} · ${sh.total} ${E.plural(sh.total, 'удачное сочетание', 'удачных сочетания', 'удачных сочетаний')} на все поводы и погоду`
       : 'Гардероб пуст — вот с чего начать';
-    const idea = (type, color, why) => `<div class="card"><div class="idea">${`<div class="tile">${shape(type, color)}</div>`}<div class="tx"><b>${esc(D.TYPE[type].name)} · ${esc(D.COL[color].name)}</b>${esc(why)}</div></div>${shopBtns(type, color)}</div>`;
+    const idea = (type, color, why) => `<div class="card"><div class="idea">${`<div class="tile">${shape(type, color)}</div>`}<div class="tx"><b>${esc(D.TYPE[type].name)} · ${esc(D.COL[color].name)}</b>${esc(why)}${sizeNote(type)}</div></div>${shopBtns(type, color)}</div>`;
     let html = '';
     if (sh.emptyOcc.length) html += `<div class="h2">Поводы без образа</div><p class="p">Пока не собрать ни одного образа: ${sh.emptyOcc.map(o => '«' + D.OCC[o].name + '»').join(', ')}. Покупки ниже это исправят.</p>`;
     html += `<div class="h2">Лучшие покупки</div>`;
+    if (!S.prof.meas?.b && !S.prof.meas?.h) html += '<p class="p">Укажите мерки во вкладке «Я» → «Фигура и размер» — подскажу, какой размер брать.</p>';
     html += sh.ideas.length ? sh.ideas.map(i => idea(i.type, i.color, i.why)).join('')
       : '<p class="p">Гардероб хорошо собран: ни одна базовая вещь не добавит заметно новых сочетаний.</p>';
     if (sh.orphans.length) html += `<div class="h2">Вещи без пары</div><p class="p">С этими вещами пока не собрать удачный образ. Подойдет:</p>` +
-      sh.orphans.map(o => `<div class="card"><div class="idea">${tile(o.item)}<div class="tx"><b>${esc(E.itemName(o.item))}</b>${o.type ? `подойдет: ${esc(D.TYPE[o.type].name.toLowerCase())}, цвет «${esc(D.COL[o.color].name)}»` : ''}</div></div>${o.type ? shopBtns(o.type, o.color) : ''}</div>`).join('');
+      sh.orphans.map(o => `<div class="card"><div class="idea">${tile(o.item)}<div class="tx"><b>${esc(E.itemName(o.item))}</b>${o.type ? `подойдет: ${esc(D.TYPE[o.type].name.toLowerCase())}, цвет «${esc(D.COL[o.color].name)}»${sizeNote(o.type)}` : ''}</div></div>${o.type ? shopBtns(o.type, o.color) : ''}</div>`).join('');
     $('#shopBody').innerHTML = html;
   });
 }
 
+function sizeNote(type) {
+  const s = D.sizeFor(S.prof, type);
+  return s ? `<span class="size">Ваш размер: <b>${esc(s.size)}</b> — ${esc(s.note)}</span>` : '';
+}
 function shopBtns(type, color) {
   const l = D.shopLinks(type, color);
   return `<div class="shop"><a class="btn" href="${l.wb}" target="_blank" rel="noopener">Wildberries</a><a class="btn" href="${l.ozon}" target="_blank" rel="noopener">Озон</a></div>`;
@@ -409,8 +414,8 @@ function renderMe() {
   show(`
     <header class="top"><h1 class="ttl">Я</h1><div class="sub">Подбор учитывает все это</div></header>
     <div class="list">
-      ${r('pf-body', 'Рост и волосы', `${p.height ? p.height + ' см' : 'рост не указан'} · ${D.HAIR_LEN.find(h => h.id === p.hair)?.name.toLowerCase() || 'средние'} волосы`)}
-      ${r('pf-shape', 'Тип фигуры', D.BODYM[p.body]?.name || 'не указан')}
+      ${r('pf-body', 'Рост, волосы, обувь', `${p.height ? p.height + ' см' : 'рост не указан'} · ${D.HAIR_LEN.find(h => h.id === p.hair)?.name.toLowerCase() || 'средние'} волосы${p.shoe ? ` · обувь ${p.shoe}` : ''}`)}
+      ${r('pf-shape', 'Фигура и размер', `${D.BODYM[p.body]?.name || 'тип не указан'}${D.sizeFor(p, 'blouse') ? ` · верх ${D.sizeFor(p, 'blouse').size}, низ ${D.sizeFor(p, 'trousers').size}` : ' · мерки не указаны'}`)}
       ${r('pf-color', 'Цветотип', D.CTM[p.colortype] ? `${D.CTM[p.colortype].name} (${D.CTM[p.colortype].note})` : 'не указан')}
       ${r('pf-city', 'Город для погоды', p.city?.name || 'не указан')}
       ${r('fit-open', 'Примерка', 'мое фото во весь рост и вещи поверх')}
@@ -449,24 +454,26 @@ function renderOnboarding() {
 function stepHtml(name) {
   const p = S.prof;
   if (name === 'body') return `
-    <div class="sh" style="margin-top:20px">Рост и волосы</div>
+    <div class="sh" style="margin-top:20px">Рост, волосы, обувь</div>
     <p class="p">Рост нужен для пропорций: например, при росте до 160 см советую обувь в тон низа. Можно пропустить.</p>
     <div class="lbl">Рост, см</div>
     <input class="field" id="pHeight" type="number" inputmode="numeric" min="130" max="210" value="${p.height || ''}" placeholder="например, 165">
     <div class="lbl">Длина волос — для причесок</div>
-    <div class="opts">${D.HAIR_LEN.map(h => `<button class="opt${(p.hair || '') === h.id ? ' on' : ''}" data-act="pf-hair" data-id="${h.id}">${h.name}</button>`).join('')}</div>`;
+    <div class="opts">${D.HAIR_LEN.map(h => `<button class="opt${(p.hair || '') === h.id ? ' on' : ''}" data-act="pf-hair" data-id="${h.id}">${h.name}</button>`).join('')}</div>
+    <div class="lbl">Размер обуви — для покупок</div>
+    <input class="field" id="pShoe" type="number" inputmode="decimal" min="30" max="46" step="0.5" value="${p.shoe || ''}" placeholder="например, 37">`;
   if (name === 'shape') return `
     <div class="sh" style="margin-top:20px">Тип фигуры</div>
-    <p class="p">Выберите похожий или посчитайте по меркам ниже.</p>
+    <p class="p">Выберите похожий или посчитайте по меркам ниже. Мерки нужны и для размера одежды в «Докупить».</p>
     <div class="cards">${D.BODY.map(b => `<button class="pick${p.body === b.id ? ' on' : ''}" data-act="pf-shapeset" data-id="${b.id}">${bodySvg(b.id)}<div><b>${b.name}</b><span>${b.hint}</span></div></button>`).join('')}</div>
-    <div class="lbl">Не знаю — посчитать по меркам, см</div>
+    <div class="lbl">Мерки, см</div>
     <div class="meas">
-      <label>Грудь<input class="field" id="mB" type="number" inputmode="numeric" value="${S.meas?.[0] || ''}"></label>
-      <label>Талия<input class="field" id="mW" type="number" inputmode="numeric" value="${S.meas?.[1] || ''}"></label>
-      <label>Бедра<input class="field" id="mH" type="number" inputmode="numeric" value="${S.meas?.[2] || ''}"></label>
+      <label>Грудь<input class="field" id="mB" type="number" inputmode="numeric" value="${p.meas?.b || ''}"></label>
+      <label>Талия<input class="field" id="mW" type="number" inputmode="numeric" value="${p.meas?.w || ''}"></label>
+      <label>Бедра<input class="field" id="mH" type="number" inputmode="numeric" value="${p.meas?.h || ''}"></label>
     </div>
-    <div class="bar" style="margin-top:10px"><button class="btn" data-act="pf-calc">Посчитать</button></div>
-    <div id="calcRes"></div>`;
+    <div class="bar" style="margin-top:10px"><button class="btn" data-act="pf-calc">Посчитать фигуру и размер</button></div>
+    <div id="calcRes">${sizeLine(p)}</div>`;
   if (name === 'color') return `
     <div class="sh" style="margin-top:20px">Цветотип</div>
     <p class="p">По нему подбираю цвета у лица и оттенки макияжа.</p>
@@ -501,6 +508,18 @@ function bodySvg(id) {
 function readStep() {
   const h = $('#pHeight');
   if (h) S.prof.height = h.value ? Math.max(120, Math.min(220, +h.value)) : '';
+  const sh = $('#pShoe');
+  if (sh) S.prof.shoe = sh.value ? Math.max(30, Math.min(46, +sh.value)) : '';
+  if ($('#mB')) {
+    const v = id => { const x = +$(id).value; return x >= 50 && x <= 160 ? x : 0; };
+    S.prof.meas = { b: v('#mB'), w: v('#mW'), h: v('#mH') };
+  }
+}
+// Размер одежды одной строкой (верх по груди, низ по бедрам)
+function sizeLine(p) {
+  const top = D.sizeFor(p, 'blouse'), bot = D.sizeFor(p, 'trousers');
+  if (!top && !bot) return '';
+  return `<div class="result">Ваш размер по типовой таблице: ${top ? `верх <b>${top.size}</b>` : ''}${top && bot ? ', ' : ''}${bot ? `низ <b>${bot.size}</b>` : ''}. У марок таблицы отличаются — сверяйте на карточке товара.</div>`;
 }
 function saveProf() { DB.save('profile', S.prof); S.shop = null; S.dirty = true; recompute(); }
 
@@ -649,7 +668,7 @@ function refreshStep() {
 function calcShape() {
   const b = +$('#mB').value, w = +$('#mW').value, h = +$('#mH').value;
   if (!b || !w || !h) return toast('Заполните все три мерки');
-  S.meas = [b, w, h];
+  S.prof.meas = { b, w, h };
   let id;
   if (w >= b * 0.9 && w >= h * 0.85) id = 'apple';
   else if (h > b * 1.05) id = 'pear';
@@ -659,7 +678,8 @@ function calcShape() {
   S.prof.body = id;
   const pf = $('#pf');
   pf.innerHTML = stepHtml('shape');
-  $('#calcRes').innerHTML = `<div class="result">По меркам: <b>${D.BODYM[id].name}</b>. ${D.BODYM[id].hint}.</div>`;
+  saveProf();
+  $('#calcRes').innerHTML = `<div class="result">По меркам: <b>${D.BODYM[id].name}</b>. ${D.BODYM[id].hint}.</div>${sizeLine(S.prof)}`;
 }
 function calcCt() {
   const warm = (quiz.veins === 'warm') + (quiz.metal === 'warm');
