@@ -1,0 +1,17 @@
+[build]
+  publish = "."
+  command = ""
+
+# сервис-воркер и страница всегда свежие, чтобы обновления доходили до телефона
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
